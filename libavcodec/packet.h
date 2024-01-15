@@ -199,6 +199,16 @@ enum AVPacketSideDataType {
     AV_PKT_DATA_WEBVTT_SETTINGS,
 
     /**
+     * TODO: Document
+     */
+    AV_PKT_DATA_SRV3_HEAD,
+
+    /**
+     * TODO: Document
+     */
+    AV_PKT_DATA_SRV3_EVENT,
+
+    /**
      * A list of zero terminated key/value strings. There is no end marker for
      * the list, so it is required to rely on the side data size to stop. This
      * side data includes updated metadata which appeared in the stream.
