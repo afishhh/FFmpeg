@@ -734,6 +734,7 @@ extern const FFCodec ff_webvtt_encoder;
 extern const FFCodec ff_webvtt_decoder;
 extern const FFCodec ff_xsub_encoder;
 extern const FFCodec ff_xsub_decoder;
+extern const FFCodec ff_srv3_decoder;
 
 /* external libraries */
 extern const FFCodec ff_aac_at_encoder;
