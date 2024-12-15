@@ -288,6 +288,8 @@ const char *av_packet_side_data_name(enum AVPacketSideDataType type)
     case AV_PKT_DATA_MATROSKA_BLOCKADDITIONAL:   return "Matroska BlockAdditional";
     case AV_PKT_DATA_WEBVTT_IDENTIFIER:          return "WebVTT ID";
     case AV_PKT_DATA_WEBVTT_SETTINGS:            return "WebVTT Settings";
+    case AV_PKT_DATA_SRV3_HEAD:                  return "SRV3 Head";
+    case AV_PKT_DATA_SRV3_EVENT:                 return "SRV3 Event metadata";
     case AV_PKT_DATA_METADATA_UPDATE:            return "Metadata Update";
     case AV_PKT_DATA_MPEGTS_STREAM_ID:           return "MPEGTS Stream ID";
     case AV_PKT_DATA_MASTERING_DISPLAY_METADATA: return "Mastering display metadata";
