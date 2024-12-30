@@ -346,6 +346,18 @@ enum AVPacketSideDataType {
     AV_PKT_DATA_LCEVC,
 
     /**
+     * SRV3 subtitle header.
+     * Not part of public API, do not rely on its existance or layout.
+     */
+    AV_PKT_DATA_SRV3_HEAD,
+
+    /**
+     * SRV3 metadata associated with a single subtitle event.
+     * Not part of public API, do not rely on its existance or layout.
+     */
+    AV_PKT_DATA_SRV3_EVENT,
+
+    /**
      * The number of side data types.
      * This is not part of the public API/ABI in the sense that it may
      * change when new side data types are added.

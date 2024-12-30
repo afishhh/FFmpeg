@@ -3641,6 +3641,13 @@ static const AVCodecDescriptor codec_descriptors[] = {
         .long_name = NULL_IF_CONFIG_SMALL("ARIB STD-B24 caption"),
         .profiles  = NULL_IF_CONFIG_SMALL(ff_arib_caption_profiles),
     },
+    {
+        .id        = AV_CODEC_ID_SRV3,
+        .type      = AVMEDIA_TYPE_SUBTITLE,
+        .name      = "srv3",
+        .long_name = NULL_IF_CONFIG_SMALL("SRV3 subtitle"),
+        .props     = AV_CODEC_PROP_TEXT_SUB,
+    },
 
     /* other kind of codecs and pseudo-codecs */
     {
