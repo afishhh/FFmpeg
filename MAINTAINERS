@@ -249,6 +249,7 @@ Codecs:
   sonic.c                               Alex Beregszaszi
   speedhq.c                             Steinar H. Gunderson
   srt*                                  Aurelien Jacobs
+  srv3*                                 Hubert Głuchowski (CC <fishhh@fishhh.dev>)
   sunrast.c                             Ivo van Poorten
   svq3.c                                Michael Niedermayer
   truemotion1*                          Mike Melanson
@@ -467,6 +468,7 @@ Muxers/Demuxers:
   segment.c                             Stefano Sabatini
   spdif*                                Anssi Hannula
   srtdec.c                              Aurelien Jacobs
+  srv3*                                 Hubert Głuchowski (CC <fishhh@fishhh.dev>)
   swf.c                                 Baptiste Coudurier
   tta.c                                 Alex Beregszaszi
   txd.c                                 Ivo van Poorten

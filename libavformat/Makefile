@@ -571,6 +571,7 @@ OBJS-$(CONFIG_SPEEX_MUXER)               += oggenc.o \
                                             vorbiscomment.o
 OBJS-$(CONFIG_SRT_DEMUXER)               += srtdec.o subtitles.o
 OBJS-$(CONFIG_SRT_MUXER)                 += srtenc.o
+OBJS-$(CONFIG_SRV3_DEMUXER)              += srv3dec.o subtitles.o
 OBJS-$(CONFIG_STL_DEMUXER)               += stldec.o subtitles.o
 OBJS-$(CONFIG_STR_DEMUXER)               += psxstr.o
 OBJS-$(CONFIG_STREAMHASH_MUXER)          += hashenc.o
