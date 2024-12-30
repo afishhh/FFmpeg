@@ -24,10 +24,8 @@
 #include "avformat.h"
 #include "internal.h"
 
-enum SRV3PenAttrs {
-    SRV3_PEN_ATTR_ITALIC = 1,
-    SRV3_PEN_ATTR_BOLD = 2,
-};
+#define SRV3_PEN_ATTR_ITALIC (1 << 0)
+#define SRV3_PEN_ATTR_BOLD (1 << 1)
 
 // https://github.com/arcusmaximus/YTSubConverter/blob/38fb2ab469f37e8f3a5a6a27adf91d9d0e81ea4f/YTSubConverter.Shared/Formats/YttDocument.cs#L1019C14-L1019C14
 enum SRV3EdgeType {

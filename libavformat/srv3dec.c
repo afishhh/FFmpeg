@@ -44,7 +44,6 @@ typedef struct SRV3GlobalSegments {
 } SRV3GlobalSegments;
 
 typedef struct SRV3Context {
-    const AVClass *class;
     FFDemuxSubtitlesQueue q;
     SRV3Pen *pens;
     SRV3WindowPos *wps;
@@ -74,12 +73,12 @@ static SRV3Pen srv3_default_pen = {
 static void srv3_free_context_data(SRV3Context *ctx) {
     void *next;
 
-#define FREE_LIST(type, list, until)                     \
-do {                                                                \
+#define FREE_LIST(type, list, until)                                           \
+do {                                                                           \
     for (void *current = list; current && current != until; current = next) {  \
-        next = ((type*)current)->next;                              \
-        av_free(current);                                           \
-    }                                                               \
+        next = ((type*)current)->next;                                         \
+        av_free(current);                                                      \
+    }                                                                          \
 } while(0)
 
     FREE_LIST(SRV3Pen, ctx->pens, &srv3_default_pen);
@@ -101,7 +100,7 @@ static SRV3Pen *srv3_get_pen(SRV3Context *ctx, int id) {
 
 static int srv3_probe(const AVProbeData *p)
 {
-    if (strstr(p->buf, "<timedtext format=\"3\">"))
+    if (strstr(p->buf, "<timedtext") && strstr(p->buf, "format=\"3\">"))
         return AVPROBE_SCORE_MAX;
 
     return 0;
@@ -136,6 +135,42 @@ static void srv3_parse_color_attr(SRV3Context *ctx, const char *parent, xmlAttrP
     srv3_parse_numeric_value(ctx, parent, attr->name, attr->children->content + (*attr->children->content == '#'), 16, out, 0, 0xFFFFFF);
 }
 
+typedef struct SRV3AttributeDef {
+    const char *name;
+    size_t offset;
+    int min, max;
+} SRV3AttributeDef;
+
+#define SRV3_COLOR_ATTRIBUTE INT_MAX, INT_MAX
+
+static int srv3_parse_simple_attribute(SRV3Context *ctx, void *dst, const char *parent, SRV3AttributeDef *defs, xmlAttrPtr attr) {
+    while(defs->name) {
+        if(!strcmp(defs->name, attr->name)) {
+            int *out = (int*)(dst + defs->offset);
+            if(defs->min == defs->max && defs->max == INT_MAX)
+                srv3_parse_color_attr(ctx, parent, attr, out);
+            else
+                srv3_parse_numeric_attr(ctx, parent, attr, out, defs->min, defs->max);
+            return 0;
+        }
+        ++defs;
+    }
+    return 1;
+}
+
+static const SRV3AttributeDef srv3_pen_simple_attributes[] = {
+    {"id", offset(SRV3Pen, id), 0, INT_MAX},
+    {"sz", offset(SRV3Pen, font_size), 0, INT_MAX},
+    {"fs", offset(SRV3Pen, font_style), 1, 7},
+    {"et", offset(SRV3Pen, edge_type), 1, 4},
+    {"ec", offset(SRV3Pen, edge_color), SRV3_COLOR_ATTRIBUTE},
+    {"fc", offset(SRV3Pen, foreground_color), SRV3_COLOR_ATTRIBUTE},
+    {"fo", offset(SRV3Pen, foreground_alpha), 0, 0xFF},
+    {"bc", offset(SRV3Pen, background_color), SRV3_COLOR_ATTRIBUTE},
+    {"bo", offset(SRV3Pen, background_alpha), 0, 0xFF},
+    {NULL}
+};
+
 static int srv3_read_pen(SRV3Context *ctx, xmlNodePtr element)
 {
     SRV3Pen *pen = av_malloc(sizeof(SRV3Pen));
@@ -146,24 +181,8 @@ static int srv3_read_pen(SRV3Context *ctx, xmlNodePtr element)
     ctx->pens = pen;
 
     for (xmlAttrPtr attr = element->properties; attr; attr = attr->next) {
-        if (!strcmp(attr->name, "id"))
-            srv3_parse_numeric_attr(ctx, "pen", attr, &pen->id, 0, INT_MAX);
-        else if (!strcmp(attr->name, "sz"))
-            srv3_parse_numeric_attr(ctx, "pen", attr, &pen->font_size, 0, INT_MAX);
-        else if (!strcmp(attr->name, "fs"))
-            srv3_parse_numeric_attr(ctx, "pen", attr, &pen->font_style, 1, 7);
-        else if (!strcmp(attr->name, "et"))
-            srv3_parse_numeric_attr(ctx, "pen", attr, &pen->edge_type, 1, 4);
-        else if (!strcmp(attr->name, "ec"))
-            srv3_parse_color_attr(ctx, "pen", attr, &pen->edge_color);
-        else if (!strcmp(attr->name, "fc"))
-            srv3_parse_color_attr(ctx, "pen", attr, &pen->foreground_color);
-        else if (!strcmp(attr->name, "fo"))
-            srv3_parse_numeric_attr(ctx, "pen", attr, &pen->foreground_alpha, 0, 0xFF);
-        else if (!strcmp(attr->name, "bc"))
-            srv3_parse_color_attr(ctx, "pen", attr, &pen->background_color);
-        else if (!strcmp(attr->name, "bo"))
-            srv3_parse_numeric_attr(ctx, "pen", attr, &pen->background_alpha, 0, 0xFF);
+        if(!srv3_parse_simple_attribute(ctx, pen, "pen", srv3_pen_simple_attributes, attr))
+            ;
         else if (!strcmp(attr->name, "rb")) {
             srv3_parse_numeric_attr(ctx, "pen", attr, &pen->ruby_part, 0, 5);
             /*
@@ -177,14 +196,20 @@ static int srv3_read_pen(SRV3Context *ctx, xmlNodePtr element)
             pen->attrs |= (!strcmp(attr->children->content, "1")) * SRV3_PEN_ATTR_ITALIC;
         else if (!strcmp(attr->name, "b"))
             pen->attrs |= (!strcmp(attr->children->content, "1")) * SRV3_PEN_ATTR_BOLD;
-        else {
+        else
             av_log(ctx, AV_LOG_WARNING, "Unhandled pen property %s\n", attr->name);
-            continue;
-        }
     }
 
     return 0;
 }
+
+static const SRV3AttributeDef srv3_window_pos_attrs[] = {
+    {"id", offset(SRV3WindowPos, id), 0, INT_MAX},
+    {"ap", offset(SRV3WindowPos, point), 0, 8},
+    {"ah", offset(SRV3WindowPos, x), 0, 100},
+    {"av", offset(SRV3WindowPos, y), 0, 100},
+    {NULL}
+};
 
 static int srv3_read_window_pos(SRV3Context *ctx, xmlNodePtr element)
 {
@@ -194,20 +219,11 @@ static int srv3_read_window_pos(SRV3Context *ctx, xmlNodePtr element)
     wp->next = ctx->wps;
     ctx->wps = wp;
 
-    for (xmlAttrPtr attr = element->properties; attr; attr = attr->next) {
-        if (!strcmp(attr->name, "id"))
-            srv3_parse_numeric_attr(ctx, "window pos", attr, &wp->id, 0, INT_MAX);
-        else if (!strcmp(attr->name, "ap"))
-            srv3_parse_numeric_attr(ctx, "window pos", attr, &wp->point, 0, 8);
-        else if (!strcmp(attr->name, "ah"))
-            srv3_parse_numeric_attr(ctx, "window pos", attr, &wp->x, 0, 100);
-        else if (!strcmp(attr->name, "av"))
-            srv3_parse_numeric_attr(ctx, "window pos", attr, &wp->y, 0, 100);
-        else {
+    for (xmlAttrPtr attr = element->properties; attr; attr = attr->next)
+        if(srv3_parse_simple_attribute(ctx, wp, "window pos", srv3_window_pos_attrs, attr))
             av_log(ctx, AV_LOG_WARNING, "Unhandled window pos property %s\n", attr->name);
             continue;
         }
-    }
 
     return 0;
 }
@@ -490,21 +506,10 @@ static av_cold int srv3_read_close(AVFormatContext *s)
     return 0;
 }
 
-static const AVOption options[] = {
-    { NULL }
-};
-
-static const AVClass srv3_demuxer_class = {
-    .class_name  = "SRV3 demuxer",
-    .option      = options,
-    .version     = LIBAVUTIL_VERSION_INT,
-};
-
 const FFInputFormat ff_srv3_demuxer = {
     .p.name         = "srv3",
     .p.long_name    = NULL_IF_CONFIG_SMALL("SRV3 subtitle"),
     .p.extensions   = "srv3",
-    .p.priv_class   = &srv3_demuxer_class,
     .priv_data_size = sizeof(SRV3Context),
     .flags_internal = FF_INFMT_FLAG_INIT_CLEANUP,
     .read_probe     = srv3_probe,
