@@ -135,6 +135,51 @@ static void srv3_parse_color_attr(SRV3Context *ctx, const char *parent, xmlAttrP
     srv3_parse_numeric_value(ctx, parent, attr->name, attr->children->content + (*attr->children->content == '#'), 16, out, 0, 0xFFFFFF);
 }
 
+typedef struct SRV3AttributeDef {
+    const char *name;
+    size_t offset;
+    int min, max;
+} SRV3AttributeDef;
+
+static void srv3_parse_attributes(SRV3Context *ctx, void *dst, const char *parent, const SRV3AttributeDef *defs, xmlAttrPtr attr) {
+    for (; attr; attr = attr->next) {
+        for(const SRV3AttributeDef *def = defs; def->name; ++def)
+            if(!strcmp(def->name, attr->name)) {
+                int *out = (int*)((char*)dst + def->offset);
+                if(def->min == INT_MAX) {
+                    if(def->max == INT_MAX)
+                        srv3_parse_color_attr(ctx, parent, attr, out);
+                    else
+                        *out |= (!strcmp(attr->children->content, "1")) * def->max;
+                } else
+                    srv3_parse_numeric_attr(ctx, parent, attr, out, def->min, def->max);
+                goto found;
+            }
+        av_log(ctx, AV_LOG_WARNING, "Unhandled %s property %s\n", parent, attr->name);
+found:;
+    }
+}
+
+#define NUMERIC_ATTRIBUTE(min, max) min, max
+#define COLOR_ATTRIBUTE INT_MAX, INT_MAX
+#define BITFLAG_ATTRIBUTE(value) INT_MAX, value
+
+static const SRV3AttributeDef srv3_pen_attributes[] = {
+    {"id", offsetof(SRV3Pen, id),               NUMERIC_ATTRIBUTE(0, INT_MAX)},
+    {"sz", offsetof(SRV3Pen, font_size),        NUMERIC_ATTRIBUTE(0, INT_MAX)},
+    {"fs", offsetof(SRV3Pen, font_style),       NUMERIC_ATTRIBUTE(1, 7)},
+    {"et", offsetof(SRV3Pen, edge_type),        NUMERIC_ATTRIBUTE(1, 4)},
+    {"ec", offsetof(SRV3Pen, edge_color),       COLOR_ATTRIBUTE},
+    {"fc", offsetof(SRV3Pen, foreground_color), COLOR_ATTRIBUTE},
+    {"fo", offsetof(SRV3Pen, foreground_alpha), NUMERIC_ATTRIBUTE(0, 0xFF)},
+    {"bc", offsetof(SRV3Pen, background_color), COLOR_ATTRIBUTE},
+    {"bo", offsetof(SRV3Pen, background_alpha), NUMERIC_ATTRIBUTE(0, 0xFF)},
+    {"rb", offsetof(SRV3Pen, ruby_part),        NUMERIC_ATTRIBUTE(0, 5)},
+    {"i",  offsetof(SRV3Pen, attrs),            BITFLAG_ATTRIBUTE(SRV3_PEN_ATTR_ITALIC)},
+    {"b",  offsetof(SRV3Pen, attrs),            BITFLAG_ATTRIBUTE(SRV3_PEN_ATTR_BOLD)},
+    {NULL}
+};
+
 static int srv3_read_pen(SRV3Context *ctx, xmlNodePtr element)
 {
     SRV3Pen *pen = av_malloc(sizeof(SRV3Pen));
@@ -144,46 +189,26 @@ static int srv3_read_pen(SRV3Context *ctx, xmlNodePtr element)
     pen->next = ctx->pens;
     ctx->pens = pen;
 
-    for (xmlAttrPtr attr = element->properties; attr; attr = attr->next) {
-        if (!strcmp(attr->name, "id"))
-            srv3_parse_numeric_attr(ctx, "pen", attr, &pen->id, 0, INT_MAX);
-        else if (!strcmp(attr->name, "sz"))
-            srv3_parse_numeric_attr(ctx, "pen", attr, &pen->font_size, 0, INT_MAX);
-        else if (!strcmp(attr->name, "fs"))
-            srv3_parse_numeric_attr(ctx, "pen", attr, &pen->font_style, 1, 7);
-        else if (!strcmp(attr->name, "et"))
-            srv3_parse_numeric_attr(ctx, "pen", attr, &pen->edge_type, 1, 4);
-        else if (!strcmp(attr->name, "ec"))
-            srv3_parse_color_attr(ctx, "pen", attr, &pen->edge_color);
-        else if (!strcmp(attr->name, "fc"))
-            srv3_parse_color_attr(ctx, "pen", attr, &pen->foreground_color);
-        else if (!strcmp(attr->name, "fo"))
-            srv3_parse_numeric_attr(ctx, "pen", attr, &pen->foreground_alpha, 0, 0xFF);
-        else if (!strcmp(attr->name, "bc"))
-            srv3_parse_color_attr(ctx, "pen", attr, &pen->background_color);
-        else if (!strcmp(attr->name, "bo"))
-            srv3_parse_numeric_attr(ctx, "pen", attr, &pen->background_alpha, 0, 0xFF);
-        else if (!strcmp(attr->name, "rb")) {
-            srv3_parse_numeric_attr(ctx, "pen", attr, &pen->ruby_part, 0, 5);
-            /*
-            * For whatever reason three seems to be an unused value for this enum.
-            */
-            if (pen->ruby_part == 3) {
-                pen->ruby_part = 0;
-                av_log(ctx, AV_LOG_WARNING, "Encountered unknown ruby part 3\n");
-            }
-        } else if (!strcmp(attr->name, "i"))
-            pen->attrs |= (!strcmp(attr->children->content, "1")) * SRV3_PEN_ATTR_ITALIC;
-        else if (!strcmp(attr->name, "b"))
-            pen->attrs |= (!strcmp(attr->children->content, "1")) * SRV3_PEN_ATTR_BOLD;
-        else {
-            av_log(ctx, AV_LOG_WARNING, "Unhandled pen property %s\n", attr->name);
-            continue;
-        }
+    srv3_parse_attributes(ctx, pen, "pen", srv3_pen_attributes, element->properties);
+
+    /*
+    * For whatever reason three seems to be an unused value for this enum.
+    */
+    if (pen->ruby_part == 3) {
+        pen->ruby_part = 0;
+        av_log(ctx, AV_LOG_WARNING, "Encountered unknown ruby part 3\n");
     }
 
     return 0;
 }
+
+static const SRV3AttributeDef srv3_window_pos_attrs[] = {
+    {"id", offsetof(SRV3WindowPos, id),    NUMERIC_ATTRIBUTE(0, INT_MAX)},
+    {"ap", offsetof(SRV3WindowPos, point), NUMERIC_ATTRIBUTE(0, 8)},
+    {"ah", offsetof(SRV3WindowPos, x),     NUMERIC_ATTRIBUTE(0, 100)},
+    {"av", offsetof(SRV3WindowPos, y),     NUMERIC_ATTRIBUTE(0, 100)},
+    {NULL}
+};
 
 static int srv3_read_window_pos(SRV3Context *ctx, xmlNodePtr element)
 {
@@ -193,20 +218,7 @@ static int srv3_read_window_pos(SRV3Context *ctx, xmlNodePtr element)
     wp->next = ctx->wps;
     ctx->wps = wp;
 
-    for (xmlAttrPtr attr = element->properties; attr; attr = attr->next) {
-        if (!strcmp(attr->name, "id"))
-            srv3_parse_numeric_attr(ctx, "window pos", attr, &wp->id, 0, INT_MAX);
-        else if (!strcmp(attr->name, "ap"))
-            srv3_parse_numeric_attr(ctx, "window pos", attr, &wp->point, 0, 8);
-        else if (!strcmp(attr->name, "ah"))
-            srv3_parse_numeric_attr(ctx, "window pos", attr, &wp->x, 0, 100);
-        else if (!strcmp(attr->name, "av"))
-            srv3_parse_numeric_attr(ctx, "window pos", attr, &wp->y, 0, 100);
-        else {
-            av_log(ctx, AV_LOG_WARNING, "Unhandled window pos property %s\n", attr->name);
-            continue;
-        }
-    }
+    srv3_parse_attributes(ctx, wp, "window pos", srv3_window_pos_attrs, element->properties);
 
     return 0;
 }
