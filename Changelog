@@ -8,6 +8,7 @@ version <next>:
 - OpenMAX encoders deprecated
 - libx265 alpha layer encoding
 - ADPCM IMA Xbox decoder
+- SRV3 subtitle decoder
 
 version 7.1:
 - Raw Captions with Time (RCWT) closed caption demuxer
